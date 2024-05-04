@@ -1,0 +1,146 @@
+---
+title: "Creative Data Visualization"
+format: html
+editor: visual
+---
+
+```{r}
+# Load required libraries
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(DT)
+library(grid)
+
+# simulate pure tone audiometry including both standard frequencies (250Hz-8kHz) and extended high frequencies ( 12.5kHz and 16kHz)  dataset
+set.seed(123)  # Set seed for reproducibility
+n_patients <- 1000  # Number of patients
+n_measurements <- 3  # Number of measurements per patient
+frequencies <- c(250, 500, 1000, 2000, 4000, 8000, 12500, 16000)  # Frequencies in Hz
+n_frequencies <- length(frequencies)
+patient_ids <- rep(1:n_patients, each = n_frequencies)  # Patient IDs
+
+# Generate synthetic data for right ear
+thresholds_right <- matrix(sample(20:50, size = n_patients * n_frequencies, replace = TRUE), nrow = n_frequencies)
+
+# Generate synthetic data for left ear
+thresholds_left <- matrix(sample(40:80, size = n_patients * n_frequencies, replace = TRUE), nrow = n_frequencies)
+
+# Create dataframe for right ear
+audiometry_data_right <- data.frame(
+  Patient_ID = rep(patient_ids, times = 1),
+  Frequency = rep(frequencies, times = n_patients),
+  Ear = rep("Right", each = n_patients),
+  Threshold = as.vector(thresholds_right)
+)
+
+# Create dataframe for left ear
+audiometry_data_left <- data.frame(
+  Patient_ID = rep(patient_ids, times = 1),
+  Frequency = rep(frequencies, times = n_patients),
+  Ear = rep("Left", each = n_patients),
+  Threshold = as.vector(thresholds_left)
+)
+
+# Combine dataframes
+audiometry_data <- rbind(audiometry_data_right, audiometry_data_left)
+
+# Aggregate data to have one threshold per frequency per ear for the group
+group_data <- aggregate(Threshold ~ Frequency + Ear, data = audiometry_data, FUN = function(x) mean(x, na.rm = TRUE))
+
+
+# Define UI
+
+ui <- fluidPage(
+  titlePanel("Hearing Harmony: An Exploration"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      # Image in the sidebar panel
+      img(src = "My ear image.png", height = 150, width = 150),
+      
+      # Input: Select individual or group
+      selectInput("individual_group", "Select Individual or Group:",
+                  choices = c("Individual", "Group"),
+                  selected = "Individual"),
+      
+      # Input: Select patient ID (only shown if Individual is selected)
+      conditionalPanel(
+        condition = "input.individual_group == 'Individual'",
+        selectInput("patient_id", "Select Patient ID:",
+                    choices = unique(audiometry_data$Patient_ID))
+      ),
+      
+      # Input: Select frequency range
+      sliderInput("frequency_range", "Select Frequency Range (Hz):",
+                  min = min(audiometry_data$Frequency), 
+                  max = max(audiometry_data$Frequency), 
+                  value = c(min(audiometry_data$Frequency), max(audiometry_data$Frequency)),
+                  step = 250) # Adjust step size for smoother selection
+    ),
+    
+    mainPanel(
+      # Output: Audiogram plot
+      plotOutput("audiogram"),
+      
+      # Output: DataTable
+      DTOutput("datatable"),
+      
+      # Credits
+      tags$div(
+        style = "position: fixed; bottom: 10px; right: 10px; color: gray;",
+        "Created️ by: ",
+        tags$a(href = "https://www.ncbi.nlm.nih.gov/myncbi/sajana.aryal.2/bibliography/public/", "Sajana Aryal", style = "color: #FF5733;"),
+        " | Inspired by the harmony of Audiology"
+      )
+    )
+  )
+)
+
+
+# Define server logic
+server <- function(input, output, session) {
+  filtered_data <- reactive({
+    if (input$individual_group == "Individual") {
+      audiometry_data %>%
+        filter(Patient_ID == input$patient_id)
+    } else {
+      group_data %>%
+        filter(Frequency >= input$frequency_range[1] & 
+                 Frequency <= input$frequency_range[2])
+    }
+  })
+  
+  output$audiogram <- renderPlot({
+    ggplot(filtered_data(), aes(x = Frequency, y = Threshold, color = Ear, shape = Ear, group = Ear)) +
+      geom_point(size = 5, alpha = 0.7, fill = "white") +
+      geom_line(size = 2, alpha = 0.7) +
+      scale_x_log10(breaks = c(250, 500, 1000, 2000, 4000, 8000, 12500, 16000), 
+                    labels = c("250", "500", "1k", "2k", "4k", "8k", "12.5k", "16k")) + 
+      labs(x = "Frequency (Hz)", y = "Threshold (dB HL)", 
+           title = "Hearing Thresholds vs. Frequency",
+           subtitle = if (input$individual_group == "Individual") paste("Patient ID:", input$patient_id) else "Group Data",
+           color = "Ear", shape = "Ear",
+           caption = "Source: Hearing Harmony") +
+      geom_hline(yintercept = c(0, 20, 40, 60, 80), linetype = "dotted", color = "gray") +
+      scale_color_manual(values = c("Right" = "#8B0000", "Left" = "#00008B")) +  # Dark red for right ear, dark blue for left ear
+      theme_minimal() +
+      theme(plot.title = element_text(size = 20, face = "bold"),
+            plot.subtitle = element_text(size = 16, color = "gray"),
+            axis.title = element_text(size = 14),
+            axis.text = element_text(size = 12),
+            legend.position = "bottom",
+            panel.grid.minor = element_line(color = "gray", linetype = "dashed"),
+            panel.grid.major = element_line(color = "gray", linetype = "dashed"))
+  })
+
+  
+  output$datatable <- renderDT({
+    filtered_data()
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+
+```
