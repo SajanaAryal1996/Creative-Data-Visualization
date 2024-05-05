@@ -12,7 +12,10 @@ library(dplyr)
 library(DT)
 library(grid)
 
+#Real dataset could not find from the lab for this visualization. Hence, I decided to simulate the data which looks similar as real audiometry dataset.
+
 # simulate pure tone audiometry including both standard frequencies (250Hz-8kHz) and extended high frequencies ( 12.5kHz and 16kHz)  dataset
+
 set.seed(123)  # Set seed for reproducibility
 n_patients <- 1000  # Number of patients
 n_measurements <- 3  # Number of measurements per patient
