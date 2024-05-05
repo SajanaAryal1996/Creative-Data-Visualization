@@ -1,5 +1,5 @@
 ---
-title: "Shiny Web App Creative Data Visualization"
+title: "Shiny Web App Data Visualization"
 format: html
 editor: visual
 ---
